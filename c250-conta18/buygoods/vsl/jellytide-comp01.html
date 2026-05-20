@@ -107,6 +107,25 @@
     margin: 0;
   }
 
+  /* ============================================================
+     COMMENTS BEFORE DELAY — visible while .hide is still hiding
+     the delayed content. As soon as #delayedContent loses .hide
+     (vTurb reveals it), this class auto-hides via CSS sibling.
+
+     Logic: #delayedContent.hide ~ #commentsBlock → visible
+            #delayedContent (no .hide) ~ #commentsBlock → hidden
+     We invert with :has() so source order doesn't matter.
+     ============================================================ */
+  body:has(#delayedContent:not(.hide)) #commentsBlock {
+    display: none !important;
+  }
+
+  /* Fallback for browsers without :has() (older Firefox <121, etc.) —
+     JS will toggle .comments-gone on the body */
+  body.comments-gone #commentsBlock {
+    display: none !important;
+  }
+
   /* Hide site announcement bar on this page */
   .vsl-jelly .announcement { display: none; }
 
@@ -1269,52 +1288,66 @@
 
 <!-- ============================================================
      vTurb DELAY SYNC (3540s = 59:00 into video)
-     Hides comments and reveals offer block.
-     persist:true → caches via localStorage so returning
-     viewers see content instantly.
+     Reveals offer block (.hide → visible).
+     Comments auto-hide via CSS :has() when #delayedContent
+     loses .hide class. No polling — purely class-based, same
+     as React's {!isVisible && <comments />} pattern.
 
-     PREVIEW MODE: append ?preview=true to URL to skip the
-     delay and show everything immediately (for QA).
+     PREVIEW MODE: ?preview=true skips the delay.
      ============================================================ -->
 <script>
   (function () {
     var urlParams = new URLSearchParams(window.location.search);
     var previewMode = urlParams.get('preview') === 'true';
 
-    // Preview mode bypass — reveal everything immediately, no video required
-    if (previewMode) {
+    function revealHidden() {
       document.querySelectorAll('.hide').forEach(function (el) {
         el.classList.remove('hide');
       });
-      return; // skip the vTurb delay setup entirely
+      // Fallback flag for browsers without :has() support
+      document.body.classList.add('comments-gone');
     }
 
-    // Normal mode — wait for vTurb player + delay
-    var delaySeconds = 3540;
-    var player = document.querySelector("vturb-smartplayer");
-    if (player) {
-      player.addEventListener("player:ready", function () {
-        player.displayHiddenElements(delaySeconds, [".hide"], { persist: true });
+    function init() {
+      // Preview mode: reveal everything immediately
+      if (previewMode) {
+        revealHidden();
+        return;
+      }
+
+      // Normal mode — vTurb delay
+      var delaySeconds = 3540;
+      var player = document.querySelector("vturb-smartplayer");
+      if (player) {
+        player.addEventListener("player:ready", function () {
+          player.displayHiddenElements(delaySeconds, [".hide"], { persist: true });
+        });
+      }
+
+      // Watch #delayedContent for class change — if vTurb removes .hide,
+      // add fallback class to body for older browsers
+      var delayedEl = document.getElementById('delayedContent');
+      if (!delayedEl) return;
+      var obs = new MutationObserver(function () {
+        if (!delayedEl.classList.contains('hide')) {
+          document.body.classList.add('comments-gone');
+          obs.disconnect();
+        }
       });
+      obs.observe(delayedEl, { attributes: true, attributeFilter: ['class'] });
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
     }
   })();
-
-  // When delayed content becomes visible, hide the comments block above it
-  // (the comments are pre-VSL social proof; once the offer shows, they go away)
-  var observer = new MutationObserver(function () {
-    var delayed = document.getElementById('delayedContent');
-    if (delayed && !delayed.classList.contains('hide')) {
-      var comments = document.getElementById('commentsBlock');
-      if (comments) comments.style.display = 'none';
-      observer.disconnect();
-    }
-  });
-  var delayedEl = document.getElementById('delayedContent');
-  if (delayedEl) observer.observe(delayedEl, { attributes: true, attributeFilter: ['class', 'style'] });
 </script>
 
 <!-- ============================================================
      COUNTDOWN TIMERS (10:00 → 0)
+     Starts when #delayedContent loses .hide class.
      ============================================================ -->
 <script>
   (function () {
@@ -1333,24 +1366,36 @@
       tick();
     }
 
-    // Start timers only once the delayed content appears
-    function watchAndStart() {
+    function startAll() {
+      startCountdown('countdown1', 600);
+      startCountdown('countdown2', 600);
+    }
+
+    function init() {
       var delayed = document.getElementById('delayedContent');
       if (!delayed) return;
-      var started = false;
-      function maybeStart() {
-        if (started) return;
-        if (!delayed.classList.contains('hide')) {
-          started = true;
-          startCountdown('countdown1', 600);
-          startCountdown('countdown2', 600);
-        }
+
+      // If already revealed (preview mode or cached)
+      if (!delayed.classList.contains('hide')) {
+        startAll();
+        return;
       }
-      maybeStart();
-      var observer2 = new MutationObserver(maybeStart);
-      observer2.observe(delayed, { attributes: true, attributeFilter: ['class', 'style'] });
+
+      // Otherwise wait for class to change
+      var obs = new MutationObserver(function () {
+        if (!delayed.classList.contains('hide')) {
+          startAll();
+          obs.disconnect();
+        }
+      });
+      obs.observe(delayed, { attributes: true, attributeFilter: ['class'] });
     }
-    watchAndStart();
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
   })();
 </script>
 
