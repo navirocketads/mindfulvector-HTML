@@ -2,6 +2,8 @@ User-agent: *
 Allow: /
 Disallow: /cart
 Disallow: /checkout
+Disallow: /vslwhiteteste
+Disallow: /c250-conta18/
 
 User-agent: Googlebot
 Allow: /
