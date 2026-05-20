@@ -111,6 +111,41 @@
   .vsl-jelly .announcement { display: none; }
 
   /* ============================================================
+     URGENCY BANNER (red strip at the top)
+     ============================================================ */
+  .urgency-banner {
+    background: #cc0000;
+    color: #ffffff;
+    font-family: 'Inter', Arial, sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.02em;
+    padding: 10px 16px;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    line-height: 1.3;
+  }
+  .urgency-dot {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    background: #ffffff;
+    border-radius: 50%;
+    flex-shrink: 0;
+    animation: urgencyBlink 1.2s infinite;
+  }
+  @keyframes urgencyBlink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.25; }
+  }
+  @media (max-width: 600px) {
+    .urgency-banner { font-size: 11.5px; padding: 9px 12px; }
+  }
+
+  /* ============================================================
      VIDEO SECTION — full width hero
      ============================================================ */
   .vsl-video-wrap {
@@ -694,29 +729,12 @@
 <body class="vsl-jelly">
 
 <!-- ============================================================
-     SITE HEADER
+     URGENCY BANNER (replaces site header)
      ============================================================ -->
-<header class="header" style="background:#fff;">
-  <div class="container header-inner">
-    <a href="/" class="logo">
-      <span class="logo-mark"></span>
-      MindfulVector
-    </a>
-    <nav class="nav">
-      <a href="/shop">Shop</a>
-      <a href="/about">About</a>
-      <a href="/blog">Journal</a>
-      <a href="/faq">FAQ</a>
-      <a href="/contact">Contact</a>
-    </nav>
-    <div class="header-actions">
-      <a href="/cart" class="cart-btn">
-        Cart <span class="cart-count" data-cart-count>0</span>
-      </a>
-      <button class="mobile-toggle" aria-label="Toggle menu">☰</button>
-    </div>
-  </div>
-</header>
+<div class="urgency-banner">
+  <span class="urgency-dot"></span>
+  <span>LIMITED ACCESS — THIS VIDEO WILL ONLY BE AVAILABLE FOR THE NEXT FEW MINUTES</span>
+</div>
 
 <!-- ============================================================
      VIDEO HERO — full width
@@ -1254,15 +1272,32 @@
      Hides comments and reveals offer block.
      persist:true → caches via localStorage so returning
      viewers see content instantly.
+
+     PREVIEW MODE: append ?preview=true to URL to skip the
+     delay and show everything immediately (for QA).
      ============================================================ -->
 <script>
-  var delaySeconds = 3540;
-  var player = document.querySelector("vturb-smartplayer");
-  if (player) {
-    player.addEventListener("player:ready", function () {
-      player.displayHiddenElements(delaySeconds, [".hide"], { persist: true });
-    });
-  }
+  (function () {
+    var urlParams = new URLSearchParams(window.location.search);
+    var previewMode = urlParams.get('preview') === 'true';
+
+    // Preview mode bypass — reveal everything immediately, no video required
+    if (previewMode) {
+      document.querySelectorAll('.hide').forEach(function (el) {
+        el.classList.remove('hide');
+      });
+      return; // skip the vTurb delay setup entirely
+    }
+
+    // Normal mode — wait for vTurb player + delay
+    var delaySeconds = 3540;
+    var player = document.querySelector("vturb-smartplayer");
+    if (player) {
+      player.addEventListener("player:ready", function () {
+        player.displayHiddenElements(delaySeconds, [".hide"], { persist: true });
+      });
+    }
+  })();
 
   // When delayed content becomes visible, hide the comments block above it
   // (the comments are pre-VSL social proof; once the offer shows, they go away)
